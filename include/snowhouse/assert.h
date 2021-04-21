@@ -8,6 +8,9 @@
 
 #include "assertionexception.h"
 #include "fluent/expressionbuilder.h"
+#include "withmessagewrapper.h"
+
+#include <string>
 
 // clang-format off
 #define SNOWHOUSE_ASSERT_THAT(P1, P2, FAILURE_HANDLER) \
@@ -24,14 +27,24 @@ namespace snowhouse
   struct DefaultFailureHandler
   {
     template<typename ExpectedType, typename ActualType>
-    static void Handle(const ExpectedType& expected, const ActualType& actual, const char* file_name, int line_number)
+    static void Handle(const ExpectedType& expected, const ActualType& actual, const std::string& message, const char* file_name, int line_number)
     {
       std::ostringstream str;
+
+      if (message.length()) {
+          str << message << std::endl;
+      }
 
       str << "Expected: " << snowhouse::Stringize(expected) << std::endl;
       str << "Actual: " << snowhouse::Stringize(actual) << std::endl;
 
       throw AssertionException(str.str(), file_name, line_number);
+    }
+
+    template<typename ExpectedType, typename ActualType>
+    static void Handle(const ExpectedType& expected, const ActualType& actual, const char* file_name, int line_number)
+    {
+        Handle(expected, actual, "", file_name, line_number);
     }
 
     static void Handle(const std::string& message)
@@ -88,6 +101,15 @@ namespace snowhouse
       {
         FailureHandler::Handle(expression, actual, file_name, line_number);
       }
+    }
+
+    template<typename ActualType, typename ExpressionType>
+    static void That(const ActualType& actual, const WithMessageWrapper<ExpressionType>& expressionWithMessage, const char* file_name = "", int line_number = 0)
+    {
+        if (!expressionWithMessage.m_expr(actual))
+        {
+            FailureHandler::Handle(expressionWithMessage.m_expr, actual, expressionWithMessage.m_msg, file_name, line_number);
+        }
     }
 
     template<typename ExpressionType>
