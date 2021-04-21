@@ -24,14 +24,24 @@ namespace snowhouse
   struct DefaultFailureHandler
   {
     template<typename ExpectedType, typename ActualType>
-    static void Handle(const ExpectedType& expected, const ActualType& actual, const char* file_name, int line_number)
+    static void Handle(const ExpectedType& expected, const ActualType& actual, const std::string& message, const char* file_name, int line_number)
     {
       std::ostringstream str;
+
+      if (!message.empty()) {
+        str << message << std::endl;
+      }
 
       str << "Expected: " << snowhouse::Stringize(expected) << std::endl;
       str << "Actual: " << snowhouse::Stringize(actual) << std::endl;
 
       throw AssertionException(str.str(), file_name, line_number);
+    }
+
+    template<typename ExpectedType, typename ActualType>
+    static void Handle(const ExpectedType& expected, const ActualType& actual, const char* file_name, int line_number)
+    {
+      Handle(expected, actual, "", file_name, line_number);
     }
 
     static void Handle(const std::string& message)
@@ -44,7 +54,7 @@ namespace snowhouse
   struct ConfigurableAssert
   {
     template<typename ActualType, typename ConstraintListType>
-    static void That(const ActualType& actual, ExpressionBuilder<ConstraintListType> expression, const char* file_name = "", int line_number = 0)
+    static void That(const ActualType& actual, ExpressionBuilder<ConstraintListType> expression, const std::string& message, const char* file_name = "", int line_number = 0)
     {
       try
       {
@@ -66,13 +76,19 @@ namespace snowhouse
 
         if (!result.top())
         {
-          FailureHandler::Handle(expression, actual, file_name, line_number);
+          FailureHandler::Handle(expression, actual, message, file_name, line_number);
         }
       }
       catch (const InvalidExpressionException& e)
       {
         FailureHandler::Handle("Malformed expression: \"" + snowhouse::Stringize(expression) + "\"\n" + e.what());
       }
+    }
+
+    template<typename ActualType, typename ConstraintListType>
+    static void That(const ActualType& actual, ExpressionBuilder<ConstraintListType> expression, const char* file_name = "", int line_number = 0)
+    {
+      return That(actual, expression, "", file_name, line_number);
     }
 
     template<typename ConstraintListType>
