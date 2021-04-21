@@ -9,6 +9,8 @@
 #include "assertionexception.h"
 #include "fluent/expressionbuilder.h"
 
+#include <string>
+
 // clang-format off
 #define SNOWHOUSE_ASSERT_THAT(P1, P2, FAILURE_HANDLER) \
   ::snowhouse::ConfigurableAssert<FAILURE_HANDLER>::That((P1), (P2), __FILE__, __LINE__)
@@ -21,17 +23,43 @@
 
 namespace snowhouse
 {
+
+    struct MessageStringSupplier {
+
+        explicit MessageStringSupplier(const std::string& message) : m_str(message) { }
+
+        std::string operator()() const {
+            return m_str;
+        }
+
+        const std::string m_str;
+    };
+
+    MessageStringSupplier AssertionMessage(const std::string& message) {
+        return MessageStringSupplier(message);
+    }
+
   struct DefaultFailureHandler
   {
     template<typename ExpectedType, typename ActualType>
-    static void Handle(const ExpectedType& expected, const ActualType& actual, const char* file_name, int line_number)
+    static void Handle(const ExpectedType& expected, const ActualType& actual, const std::string& message, const char* file_name, int line_number)
     {
       std::ostringstream str;
+
+      if (message.length()) {
+          str << message << std::endl;
+      }
 
       str << "Expected: " << snowhouse::Stringize(expected) << std::endl;
       str << "Actual: " << snowhouse::Stringize(actual) << std::endl;
 
       throw AssertionException(str.str(), file_name, line_number);
+    }
+
+    template<typename ExpectedType, typename ActualType>
+    static void Handle(const ExpectedType& expected, const ActualType& actual, const char* file_name, int line_number)
+    {
+        Handle(expected, actual, "", file_name, line_number);
     }
 
     static void Handle(const std::string& message)
@@ -88,6 +116,15 @@ namespace snowhouse
       {
         FailureHandler::Handle(expression, actual, file_name, line_number);
       }
+    }
+
+    template<typename ActualType, typename ExpressionType, typename MessageSupplierType>
+    static void That(const ActualType& actual, const ExpressionType& expression, const MessageSupplierType& messageSupplier, const char* file_name = "", int line_number = 0)
+    {
+        if (!expression(actual))
+        {
+            FailureHandler::Handle(expression, actual, messageSupplier(), file_name, line_number);
+        }
     }
 
     template<typename ExpressionType>
