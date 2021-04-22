@@ -24,6 +24,9 @@
 
 namespace snowhouse
 {
+    struct EmptyMessageSupplier {
+        std::string operator()() const { return ""; }
+    };
 
     struct MessageStringSupplier {
 
@@ -103,8 +106,8 @@ namespace snowhouse
   template<typename FailureHandler>
   struct ConfigurableAssert
   {
-    template<typename ActualType, typename ConstraintListType>
-    static void That(const ActualType& actual, ExpressionBuilder<ConstraintListType> expression, const char* file_name = "", int line_number = 0)
+    template<typename ActualType, typename ConstraintListType, typename MessageSupplierType>
+    static void That(const ActualType& actual, ExpressionBuilder<ConstraintListType> expression, const MessageSupplierType& messageSupplier, const char* file_name = "", int line_number = 0)
     {
       try
       {
@@ -126,7 +129,7 @@ namespace snowhouse
 
         if (!result.top())
         {
-          FailureHandler::Handle(expression, actual, file_name, line_number);
+          FailureHandler::Handle(expression, actual, messageSupplier(), file_name, line_number);
         }
       }
       catch (const InvalidExpressionException& e)
@@ -135,19 +138,22 @@ namespace snowhouse
       }
     }
 
+    template<typename ActualType, typename ConstraintListType>
+    static void That(const ActualType& actual, ExpressionBuilder<ConstraintListType> expression, const char* file_name = "", int line_number = 0)
+    {
+        That(actual, expression, EmptyMessageSupplier(), file_name, line_number);
+    }
+
+    template<typename ConstraintListType, typename MessageSupplierType>
+    static void That(const char* actual, ExpressionBuilder<ConstraintListType> expression, const MessageSupplierType& messageSupplier, const char* file_name = "", int line_number = 0)
+    {
+        return That(std::string(actual), expression, messageSupplier, file_name, line_number);
+    }
+
     template<typename ConstraintListType>
     static void That(const char* actual, ExpressionBuilder<ConstraintListType> expression, const char* file_name = "", int line_number = 0)
     {
-      return That(std::string(actual), expression, file_name, line_number);
-    }
-
-    template<typename ActualType, typename ExpressionType>
-    static void That(const ActualType& actual, const ExpressionType& expression, const char* file_name = "", int line_number = 0)
-    {
-      if (!expression(actual))
-      {
-        FailureHandler::Handle(expression, actual, file_name, line_number);
-      }
+      return That(actual, expression, EmptyMessageSupplier(), file_name, line_number);
     }
 
     template<typename ActualType, typename ExpressionType, typename MessageSupplierType>
@@ -159,18 +165,48 @@ namespace snowhouse
         }
     }
 
+    template<typename ActualType, typename ExpressionType>
+    static void That(const ActualType& actual, const ExpressionType& expression, const char* file_name = "", int line_number = 0)
+    {
+        That(actual, expression, EmptyMessageSupplier(), file_name, line_number);
+    }
+
+    template<typename ExpressionType, typename MessageSupplierType>
+    static void That(const char* actual, const ExpressionType& expression, const MessageSupplierType& messageSupplier, const char* file_name = "", int line_number = 0)
+    {
+        return That(std::string(actual), expression, messageSupplier, file_name, line_number);
+    }
+
     template<typename ExpressionType>
     static void That(const char* actual, const ExpressionType& expression, const char* file_name = "", int line_number = 0)
     {
-      return That(std::string(actual), expression, file_name, line_number);
+      return That(actual, expression, EmptyMessageSupplier(),  file_name, line_number);
     }
 
+    /*
+    //Unfortunately, this overload ends up being ambigous and clashes with existing ones.
+    //Can be fixed with traits or a bit of metaprogramming, but do not know how ;) Yet.
+    //To assert on booleans with a custom message, one can use `Assert::That(boolvalue, IsTrue(), msgsupplier)` or
+    //`Assert::That(boolvalue, Is().True(), msgsupplier)` (or respective equivalents `IsFalse()`/`Is().False()`.
+    template <typename MessageSupplierType>
+    static void That(bool actual, const MessageSupplierType& messageSupplier)
+    {
+        if (!actual)
+        {
+            std::string customMessage = messageSupplier();
+            std::string originalMessage("Expected: true\nActual: false");
+
+            std::string message = customMessage.length() ? (customMessage + '\n' + originalMessage) : originalMessage;
+            FailureHandler::Handle(message);
+        }
+    }    
+    */
     static void That(bool actual)
     {
-      if (!actual)
-      {
-        FailureHandler::Handle("Expected: true\nActual: false");
-      }
+        if (!actual)
+        {
+            FailureHandler::Handle("Expected: true\nActual: false");
+        }
     }
 
     static void Failure(const std::string& message)
