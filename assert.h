@@ -10,6 +10,7 @@
 #include "fluent/expressionbuilder.h"
 
 #include <string>
+#include <sstream>
 
 // clang-format off
 #define SNOWHOUSE_ASSERT_THAT(P1, P2, FAILURE_HANDLER) \
@@ -37,6 +38,37 @@ namespace snowhouse
 
     MessageStringSupplier AssertionMessage(const std::string& message) {
         return MessageStringSupplier(message);
+    }
+
+    struct MessageStreamSupplier {
+
+        MessageStreamSupplier() { }
+
+        explicit
+        MessageStreamSupplier(const std::string& message) {
+            m_str << message;
+        }
+
+        std::string operator()() const {
+            return m_str.str();
+        }
+
+        template <typename T>
+        MessageStreamSupplier& operator<< (const T& msgItem) {
+            m_str << msgItem;
+            return *this;
+        }
+
+        private:
+            std::ostringstream m_str;
+    };
+
+
+    MessageStreamSupplier MessageBuilder(const std::string& messagePrefix) {
+        return MessageStreamSupplier(messagePrefix);
+    }
+    MessageStreamSupplier MessageBuilder() {
+        return MessageStreamSupplier();
     }
 
   struct DefaultFailureHandler
