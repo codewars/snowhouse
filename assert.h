@@ -24,55 +24,7 @@
 
 namespace snowhouse
 {
-    struct EmptyMessageSupplier {
-        std::string operator()() const { return ""; }
-    };
-
-    struct MessageStringSupplier {
-
-        explicit MessageStringSupplier(const std::string& message) : m_str(message) { }
-
-        std::string operator()() const {
-            return m_str;
-        }
-
-        const std::string m_str;
-    };
-
-    MessageStringSupplier AssertionMessage(const std::string& message) {
-        return MessageStringSupplier(message);
-    }
-
-    struct MessageStreamSupplier {
-
-        MessageStreamSupplier() { }
-
-        explicit
-        MessageStreamSupplier(const std::string& message) {
-            m_str << message;
-        }
-
-        std::string operator()() const {
-            return m_str.str();
-        }
-
-        template <typename T>
-        MessageStreamSupplier& operator<< (const T& msgItem) {
-            m_str << msgItem;
-            return *this;
-        }
-
-        private:
-            std::ostringstream m_str;
-    };
-
-
-    MessageStreamSupplier MessageBuilder(const std::string& messagePrefix) {
-        return MessageStreamSupplier(messagePrefix);
-    }
-    MessageStreamSupplier MessageBuilder() {
-        return MessageStreamSupplier();
-    }
+  auto WithMessage = [](const std::string& msg) { return [&]() { return msg; }; };
 
   struct DefaultFailureHandler
   {
@@ -106,6 +58,7 @@ namespace snowhouse
   template<typename FailureHandler>
   struct ConfigurableAssert
   {
+
     template<typename ActualType, typename ConstraintListType, typename MessageSupplierType>
     static void That(const ActualType& actual, ExpressionBuilder<ConstraintListType> expression, const MessageSupplierType& messageSupplier, const char* file_name = "", int line_number = 0)
     {
@@ -141,7 +94,7 @@ namespace snowhouse
     template<typename ActualType, typename ConstraintListType>
     static void That(const ActualType& actual, ExpressionBuilder<ConstraintListType> expression, const char* file_name = "", int line_number = 0)
     {
-        That(actual, expression, EmptyMessageSupplier(), file_name, line_number);
+        That(actual, expression, []() { return std::string(); }, file_name, line_number);
     }
 
     template<typename ConstraintListType, typename MessageSupplierType>
@@ -153,7 +106,7 @@ namespace snowhouse
     template<typename ConstraintListType>
     static void That(const char* actual, ExpressionBuilder<ConstraintListType> expression, const char* file_name = "", int line_number = 0)
     {
-      return That(actual, expression, EmptyMessageSupplier(), file_name, line_number);
+      return That(actual, expression, []() { return std::string(); }, file_name, line_number);
     }
 
     template<typename ActualType, typename ExpressionType, typename MessageSupplierType>
@@ -168,7 +121,7 @@ namespace snowhouse
     template<typename ActualType, typename ExpressionType>
     static void That(const ActualType& actual, const ExpressionType& expression, const char* file_name = "", int line_number = 0)
     {
-        That(actual, expression, EmptyMessageSupplier(), file_name, line_number);
+        That(actual, expression, []() { return std::string(); }, file_name, line_number);
     }
 
     template<typename ExpressionType, typename MessageSupplierType>
@@ -180,7 +133,7 @@ namespace snowhouse
     template<typename ExpressionType>
     static void That(const char* actual, const ExpressionType& expression, const char* file_name = "", int line_number = 0)
     {
-      return That(actual, expression, EmptyMessageSupplier(),  file_name, line_number);
+      return That(actual, expression, []() { return std::string(); },  file_name, line_number);
     }
 
     /*
