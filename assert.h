@@ -33,7 +33,7 @@ namespace snowhouse
     {
       std::ostringstream str;
 
-      if (message.length()) {
+      if (!message.empty()) {
           str << message << std::endl;
       }
 
