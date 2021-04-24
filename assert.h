@@ -34,7 +34,7 @@ namespace snowhouse
 
   inline auto ExtraMessage(const std::string& msg)
   {
-    return [&]() { return msg; };
+    return [msg]() { return msg; };
   }
 
   struct DefaultFailureHandler
