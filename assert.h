@@ -9,6 +9,9 @@
 #include "assertionexception.h"
 #include "fluent/expressionbuilder.h"
 
+#include <string>
+#include <sstream>
+
 // clang-format off
 #define SNOWHOUSE_ASSERT_THAT(P1, P2, FAILURE_HANDLER) \
   ::snowhouse::ConfigurableAssert<FAILURE_HANDLER>::That((P1), (P2), __FILE__, __LINE__)
@@ -21,17 +24,40 @@
 
 namespace snowhouse
 {
+  namespace detail
+  {
+    inline std::string EmptyMessage()
+    { 
+      return std::string();
+    }
+  }
+
+  inline auto ExtraMessage(const std::string& msg)
+  {
+    return [msg]() { return msg; };
+  }
+
   struct DefaultFailureHandler
   {
     template<typename ExpectedType, typename ActualType>
-    static void Handle(const ExpectedType& expected, const ActualType& actual, const char* file_name, int line_number)
+    static void Handle(const ExpectedType& expected, const ActualType& actual, const std::string& message, const char* file_name, int line_number)
     {
       std::ostringstream str;
+
+      if (!message.empty()) {
+        str << message << std::endl;
+      }
 
       str << "Expected: " << snowhouse::Stringize(expected) << std::endl;
       str << "Actual: " << snowhouse::Stringize(actual) << std::endl;
 
       throw AssertionException(str.str(), file_name, line_number);
+    }
+
+    template<typename ExpectedType, typename ActualType>
+    static void Handle(const ExpectedType& expected, const ActualType& actual, const char* file_name, int line_number)
+    {
+      Handle(expected, actual, "", file_name, line_number);
     }
 
     static void Handle(const std::string& message)
@@ -43,8 +69,9 @@ namespace snowhouse
   template<typename FailureHandler>
   struct ConfigurableAssert
   {
-    template<typename ActualType, typename ConstraintListType>
-    static void That(const ActualType& actual, ExpressionBuilder<ConstraintListType> expression, const char* file_name = "", int line_number = 0)
+
+    template<typename ActualType, typename ConstraintListType, typename MessageSupplierType>
+    static void That(const ActualType& actual, ExpressionBuilder<ConstraintListType> expression, const MessageSupplierType& message_supplier, const char* file_name = "", int line_number = 0)
     {
       try
       {
@@ -66,7 +93,7 @@ namespace snowhouse
 
         if (!result.top())
         {
-          FailureHandler::Handle(expression, actual, file_name, line_number);
+          FailureHandler::Handle(expression, actual, message_supplier(), file_name, line_number);
         }
       }
       catch (const InvalidExpressionException& e)
@@ -75,25 +102,49 @@ namespace snowhouse
       }
     }
 
+    template<typename ActualType, typename ConstraintListType>
+    static void That(const ActualType& actual, ExpressionBuilder<ConstraintListType> expression, const char* file_name = "", int line_number = 0)
+    {
+      That(actual, expression, detail::EmptyMessage, file_name, line_number);
+    }
+
+    template<typename ConstraintListType, typename MessageSupplierType>
+    static void That(const char* actual, ExpressionBuilder<ConstraintListType> expression, const MessageSupplierType& message_supplier, const char* file_name = "", int line_number = 0)
+    {
+      return That(std::string(actual), expression, message_supplier, file_name, line_number);
+    }
+
     template<typename ConstraintListType>
     static void That(const char* actual, ExpressionBuilder<ConstraintListType> expression, const char* file_name = "", int line_number = 0)
     {
-      return That(std::string(actual), expression, file_name, line_number);
+      return That(actual, expression, detail::EmptyMessage, file_name, line_number);
+    }
+
+    template<typename ActualType, typename ExpressionType, typename MessageSupplierType>
+    static void That(const ActualType& actual, const ExpressionType& expression, const MessageSupplierType& message_supplier, const char* file_name = "", int line_number = 0)
+    {
+      if (!expression(actual))
+      {
+        FailureHandler::Handle(expression, actual, message_supplier(), file_name, line_number);
+      }
     }
 
     template<typename ActualType, typename ExpressionType>
     static void That(const ActualType& actual, const ExpressionType& expression, const char* file_name = "", int line_number = 0)
     {
-      if (!expression(actual))
-      {
-        FailureHandler::Handle(expression, actual, file_name, line_number);
-      }
+      That(actual, expression, detail::EmptyMessage, file_name, line_number);
+    }
+
+    template<typename ExpressionType, typename MessageSupplierType>
+    static void That(const char* actual, const ExpressionType& expression, const MessageSupplierType& message_supplier, const char* file_name = "", int line_number = 0)
+    {
+      return That(std::string(actual), expression, message_supplier, file_name, line_number);
     }
 
     template<typename ExpressionType>
     static void That(const char* actual, const ExpressionType& expression, const char* file_name = "", int line_number = 0)
     {
-      return That(std::string(actual), expression, file_name, line_number);
+      return That(actual, expression, detail::EmptyMessage,  file_name, line_number);
     }
 
     static void That(bool actual)
